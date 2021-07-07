@@ -1,6 +1,5 @@
 defmodule FarmbotCeleryScript.Compiler.Assertion do
   alias FarmbotCeleryScript.Compiler
-  import Compiler.Utils
   @doc "`Assert` is a internal node useful for self testing."
   def assertion(
         %{
@@ -10,9 +9,7 @@ defmodule FarmbotCeleryScript.Compiler.Assertion do
             _then: then_ast
           },
           comment: comment
-        },
-        env
-      ) do
+        }) do
     comment_header =
       if comment do
         "[#{comment}] "
@@ -24,7 +21,7 @@ defmodule FarmbotCeleryScript.Compiler.Assertion do
       comment_header = unquote(comment_header)
       assertion_type = unquote(assertion_type)
       # cmnt = unquote(comment)
-      lua_code = unquote(Compiler.compile_ast(expression, env))
+      lua_code = unquote(Compiler.compile_ast(expression))
       result = FarmbotCeleryScript.Compiler.Lua.do_lua(lua_code, better_params)
       # result = FarmbotCeleryScript.SysCalls.perform_lua(lua_code, [], cmnt)
       case result do
@@ -71,7 +68,7 @@ defmodule FarmbotCeleryScript.Compiler.Assertion do
             "#{comment_header}failed, recovering and continuing"
           )
 
-          unquote(compile_block(then_ast, env))
+          unquote(FarmbotCeleryScript.Compiler.Utils.compile_block(then_ast))
 
         {:ok, _} when assertion_type == "abort_recover" ->
           FarmbotCeleryScript.SysCalls.log_assertion(
@@ -80,14 +77,11 @@ defmodule FarmbotCeleryScript.Compiler.Assertion do
             "#{comment_header}failed, recovering and aborting"
           )
 
-          then_block = unquote(compile_block(then_ast, env))
+          then_block = unquote(FarmbotCeleryScript.Compiler.Utils.compile_block(then_ast))
 
           then_block ++
             [
-              FarmbotCeleryScript.Compiler.compile(
-                %AST{kind: :abort, args: %{}},
-                []
-              )
+              FarmbotCeleryScript.Compiler.compile(%AST{kind: :abort, args: %{}})
             ]
       end
     end

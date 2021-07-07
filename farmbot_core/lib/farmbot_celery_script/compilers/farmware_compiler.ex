@@ -1,32 +1,26 @@
 defmodule FarmbotCeleryScript.Compiler.Farmware do
   alias FarmbotCeleryScript.Compiler
 
-  def take_photo(%{body: params}, env) do
-    execute_script(%{args: %{label: "take-photo"}, body: params}, env)
+  def take_photo(%{body: params}) do
+    execute_script(%{args: %{label: "take-photo"}, body: params})
   end
 
-  def execute_script(%{args: %{label: package}, body: params}, _env) do
-    env =
-      Enum.map(params, fn %{args: %{label: key, value: value}} ->
-        {to_string(key), value}
-      end)
-
+  def execute_script(%{args: %{label: package}, body: _params}) do
     quote location: :keep do
-      package = unquote(Compiler.compile_ast(package, env))
-      env = unquote(Macro.escape(Map.new(env)))
+      package = unquote(Compiler.compile_ast(package))
       FarmbotCeleryScript.SysCalls.log(unquote(format_log(package)), true)
-      FarmbotCeleryScript.SysCalls.execute_script(package, env)
+      FarmbotCeleryScript.SysCalls.execute_script(package, [])
     end
   end
 
-  def install_first_party_farmware(_, _env) do
+  def install_first_party_farmware(_) do
     quote location: :keep do
       FarmbotCeleryScript.SysCalls.log("Installing dependencies...")
       FarmbotCeleryScript.SysCalls.install_first_party_farmware()
     end
   end
 
-  def set_user_env(%{body: pairs}, _env) do
+  def set_user_env(%{body: pairs}) do
     kvs =
       Enum.map(pairs, fn %{kind: :pair, args: %{label: key, value: value}} ->
         quote location: :keep do
@@ -42,9 +36,9 @@ defmodule FarmbotCeleryScript.Compiler.Farmware do
     end
   end
 
-  def update_farmware(%{args: %{package: package}}, env) do
+  def update_farmware(%{args: %{package: package}}) do
     quote location: :keep do
-      package = unquote(Compiler.compile_ast(package, env))
+      package = unquote(Compiler.compile_ast(package))
       FarmbotCeleryScript.SysCalls.log("Updating Farmware: #{package}", true)
       FarmbotCeleryScript.SysCalls.update_farmware(package)
     end

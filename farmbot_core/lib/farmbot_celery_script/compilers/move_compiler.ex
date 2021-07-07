@@ -2,7 +2,7 @@ defmodule FarmbotCeleryScript.Compiler.Move do
   alias FarmbotCeleryScript.SysCalls
   alias FarmbotCeleryScript.SpecialValue
 
-  def move(%{body: body}, _env) do
+  def move(%{body: body}) do
     quote location: :keep do
       node_body = unquote(body)
       mod = unquote(__MODULE__)

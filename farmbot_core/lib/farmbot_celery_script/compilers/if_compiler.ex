@@ -1,6 +1,5 @@
 defmodule FarmbotCeleryScript.Compiler.If do
   alias FarmbotCeleryScript.{AST, Compiler}
-  import FarmbotCeleryScript.Compiler.Utils
 
   # Compiles an if statement.
   def unquote(:_if)(
@@ -12,10 +11,8 @@ defmodule FarmbotCeleryScript.Compiler.If do
             op: op,
             rhs: rhs
           }
-        },
-        env
-      ) do
-    rhs = Compiler.compile_ast(rhs, env)
+        }) do
+    rhs = Compiler.compile_ast(rhs)
 
     # Turns the left hand side arg into
     # a number. x, y, z, and pin{number} are special that need to be
@@ -49,11 +46,11 @@ defmodule FarmbotCeleryScript.Compiler.If do
           quote [location: :keep],
             do:
               FarmbotCeleryScript.SysCalls.read_cached_pin(
-                unquote(Compiler.compile_ast(ast, env))
+                unquote(Compiler.compile_ast(ast))
               )
 
         %AST{} = ast ->
-          Compiler.compile_ast(ast, env)
+          Compiler.compile_ast(ast)
       end
 
     # Turn the `op` arg into Elixir code
@@ -140,13 +137,13 @@ defmodule FarmbotCeleryScript.Compiler.If do
           "Evaluated IF statement: #{result_str}; #{unquote(truthy_suffix)}"
         )
 
-        unquote(compile_block(then_ast, env))
+        unquote(FarmbotCeleryScript.Compiler.Utils.compile_block(then_ast))
       else
         FarmbotCeleryScript.SysCalls.log(
           "Evaluated IF statement: #{result_str}; #{unquote(falsey_suffix)}"
         )
 
-        unquote(compile_block(else_ast, env))
+        unquote(FarmbotCeleryScript.Compiler.Utils.compile_block(else_ast))
       end
     end
   end

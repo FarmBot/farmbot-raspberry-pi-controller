@@ -2,7 +2,7 @@ defmodule FarmbotCeleryScript.Compiler.Lua do
   alias FarmbotCeleryScript.SysCalls
   alias FarmbotCeleryScript.Compiler.VariableTransformer
 
-  def lua(%{args: %{lua: lua}}, _env) do
+  def lua(%{args: %{lua: lua}}) do
     quote location: :keep do
       mod = unquote(__MODULE__)
       mod.do_lua(unquote(lua), better_params)
