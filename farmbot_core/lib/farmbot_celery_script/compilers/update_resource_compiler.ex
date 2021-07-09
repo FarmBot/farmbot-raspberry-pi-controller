@@ -2,10 +2,9 @@ defmodule FarmbotCeleryScript.Compiler.UpdateResource do
   alias FarmbotCeleryScript.{AST, DotProps}
 
   def update_resource(%AST{args: args, body: body}) do
-    quote location: :keep do
-      me = unquote(__MODULE__)
-      variable = unquote(Map.fetch!(args, :resource))
-      update = unquote(unpair(body, %{}))
+    fn better_params ->
+      variable = (Map.fetch!(args, :resource))
+      update = (unpair(body, %{}))
 
       # Go easy on the API...
       case variable do
@@ -13,13 +12,13 @@ defmodule FarmbotCeleryScript.Compiler.UpdateResource do
           args = Map.fetch!(variable, :args)
           label = Map.fetch!(args, :label)
           resource = Map.fetch!(better_params, label)
-          me.do_update(resource, update)
+          do_update(resource, update)
 
         %AST{kind: :point} ->
-          me.do_update(variable.args(), update)
+          do_update(variable.args(), update)
 
         %AST{kind: :resource} ->
-          me.do_update(variable.args(), update)
+          do_update(variable.args(), update)
 
         res ->
           raise "Resource error. Please notfiy support: #{inspect(res)}"

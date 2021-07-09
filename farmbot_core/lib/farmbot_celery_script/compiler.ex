@@ -13,63 +13,6 @@ defmodule FarmbotCeleryScript.Compiler do
     true
   end
 
-  @valid_entry_points [:sequence, :rpc_request]
-
-  @typedoc """
-  Compiled CeleryScript node should compile to an anon function.
-  Entrypoint nodes such as
-  * `rpc_request`
-  * `sequence`
-  will compile to a function that takes a Keyword list of variables. This function
-  needs to be executed before scheduling/executing.
-
-  Non entrypoint nodes compile to a function that symbolizes one individual step.
-
-  ## Examples
-
-  `rpc_request` will be compiled to something like:
-  ```
-  fn ->
-    [
-      # Body of the `rpc_request` compiled in here.
-    ]
-  end
-  ```
-
-  as compared to a "simple" node like `wait` will compile to something like:
-  ```
-  fn() -> wait(200) end
-  ```
-  """
-  @type compiled :: (Keyword.t() -> [(() -> any())]) | (() -> any())
-
-  @doc """
-  Recursive function that will emit Elixir AST from CeleryScript AST.
-  """
-  @spec compile(AST.t()) :: [compiled()]
-  def compile(ast)
-
-  def compile(%AST{kind: :abort}) do
-    fn -> {:error, "aborted"} end
-  end
-
-  def compile(%AST{kind: kind} = ast) when kind in @valid_entry_points do
-    compile_entry_point(compile_ast(ast), [])
-  end
-
-  def compile_entry_point([compiled | rest], acc) do
-    debug_mode?() && print_compiled_code(compiled)
-    # entry points must be evaluated once more with the calling `env`
-    # to return a list of compiled `steps`
-    case Macro.to_string(compiled) |> Code.eval_string() do
-      {fun, _env} when is_function(fun, 0) ->
-        compile_entry_point(rest, acc ++ apply(fun, []))
-
-      {{:error, error}, _} ->
-        {:error, error}
-    end
-  end
-
   def compile_entry_point([], acc) do
     acc
   end
@@ -104,33 +47,33 @@ defmodule FarmbotCeleryScript.Compiler do
   defdelegate write_pin(ast), to: Compiler.PinControl
   defdelegate zero(ast), to: Compiler.AxisControl
 
-  def compile_ast(ast_or_literal)
+  def ast2elixir(ast_or_literal)
 
-  def compile_ast(%AST{kind: kind} = ast) do
+  def ast2elixir(%AST{kind: kind} = ast) do
     if function_exported?(__MODULE__, kind, 1),
       do: apply(__MODULE__, kind, [ast]),
       else: raise("no compiler for #{kind}")
   end
 
-  def compile_ast(lit) when is_number(lit), do: lit
+  def ast2elixir(lit) when is_number(lit), do: lit
 
-  def compile_ast(lit) when is_binary(lit), do: lit
+  def ast2elixir(lit) when is_binary(lit), do: lit
 
   def nothing(_ast) do
-    quote location: :keep do
+    fn _better_params ->
       FarmbotCeleryScript.SysCalls.nothing()
     end
   end
 
   def abort(_ast) do
-    quote location: :keep do
-      Macro.escape({:error, "aborted"})
+    fn _better_params ->
+      {:error, "aborted"}
     end
   end
 
   def wait(%{args: %{milliseconds: millis}}) do
-    quote location: :keep do
-      with millis when is_integer(millis) <- unquote(compile_ast(millis)) do
+    fn _better_params ->
+      with millis when is_integer(millis) <- millis do
         FarmbotCeleryScript.SysCalls.log("Waiting for #{millis} milliseconds")
         FarmbotCeleryScript.SysCalls.wait(millis)
       else
@@ -155,12 +98,8 @@ defmodule FarmbotCeleryScript.Compiler do
         String.to_atom(channel_name)
       end)
 
-    quote location: :keep do
-      FarmbotCeleryScript.SysCalls.send_message(
-        unquote(compile_ast(type)),
-        unquote(compile_ast(msg)),
-        unquote(channels)
-      )
+    fn _better_params ->
+      FarmbotCeleryScript.SysCalls.send_message(type, msg, channels)
     end
   end
 
@@ -173,66 +112,62 @@ defmodule FarmbotCeleryScript.Compiler do
   end
 
   def emergency_lock(_) do
-    quote location: :keep do
+    fn _better_params ->
       FarmbotCeleryScript.SysCalls.emergency_lock()
     end
   end
 
   def emergency_unlock(_) do
-    quote location: :keep do
+    fn _better_params ->
       FarmbotCeleryScript.SysCalls.emergency_unlock()
     end
   end
 
   def read_status(_) do
-    quote location: :keep do
+    fn _better_params ->
       FarmbotCeleryScript.SysCalls.read_status()
     end
   end
 
   def sync(_) do
-    quote location: :keep do
+    fn _better_params ->
       FarmbotCeleryScript.SysCalls.sync()
     end
   end
 
   def check_updates(_) do
-    quote location: :keep do
+    fn _better_params ->
       FarmbotCeleryScript.SysCalls.check_update()
     end
   end
 
   def flash_firmware(%{args: %{package: package_name}}) do
-    quote location: :keep do
-      FarmbotCeleryScript.SysCalls.flash_firmware(
-        unquote(compile_ast(package_name))
-      )
+    fn _better_params ->
+      FarmbotCeleryScript.SysCalls.flash_firmware(package_name)
     end
   end
 
   def power_off(_) do
-    quote location: :keep do
+    fn _better_params ->
       FarmbotCeleryScript.SysCalls.power_off()
     end
   end
 
   def reboot(%{args: %{package: "farmbot_os"}}) do
-    quote location: :keep do
+    fn _better_params ->
       FarmbotCeleryScript.SysCalls.reboot()
     end
   end
 
   def reboot(%{args: %{package: "arduino_firmware"}}) do
-    quote location: :keep do
+    fn _better_params ->
       FarmbotCeleryScript.SysCalls.firmware_reboot()
     end
   end
 
   def factory_reset(%{args: %{package: package}}) do
-    quote location: :keep do
-      FarmbotCeleryScript.SysCalls.factory_reset(
-        unquote(compile_ast(package))
-      )
+    fn _ ->
+      FarmbotCeleryScript.SysCalls.factory_reset(package)
     end
   end
 
@@ -250,12 +185,8 @@ defmodule FarmbotCeleryScript.Compiler do
 
     server = Map.get(pairs, "server")
 
-    quote location: :keep do
-      FarmbotCeleryScript.SysCalls.change_ownership(
-        unquote(compile_ast(email)),
-        unquote(compile_ast(secret)),
-        unquote(compile_ast(server))
-      )
+    fn _better_params ->
+      FarmbotCeleryScript.SysCalls.change_ownership(email, secret, server)
     end
   end
 

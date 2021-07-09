@@ -3,9 +3,8 @@ defmodule FarmbotCeleryScript.Compiler.Lua do
   alias FarmbotCeleryScript.Compiler.VariableTransformer
 
   def lua(%{args: %{lua: lua}}) do
-    quote location: :keep do
-      mod = unquote(__MODULE__)
-      mod.do_lua(unquote(lua), better_params)
+    fn better_params ->
+      do_lua(lua, better_params)
     end
   end
 

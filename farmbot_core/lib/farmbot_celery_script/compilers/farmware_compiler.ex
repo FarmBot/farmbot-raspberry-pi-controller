@@ -6,15 +6,15 @@ defmodule FarmbotCeleryScript.Compiler.Farmware do
   end
 
   def execute_script(%{args: %{label: package}, body: _params}) do
-    quote location: :keep do
-      package = unquote(Compiler.compile_ast(package))
-      FarmbotCeleryScript.SysCalls.log(unquote(format_log(package)), true)
+    fn _better_params ->
+      package = Compiler.ast2elixir(package)
+      FarmbotCeleryScript.SysCalls.log(format_log(package), true)
       FarmbotCeleryScript.SysCalls.execute_script(package, [])
     end
   end
 
   def install_first_party_farmware(_) do
-    quote location: :keep do
+    fn _better_params ->
       FarmbotCeleryScript.SysCalls.log("Installing dependencies...")
       FarmbotCeleryScript.SysCalls.install_first_party_farmware()
     end
@@ -23,22 +23,20 @@ defmodule FarmbotCeleryScript.Compiler.Farmware do
   def set_user_env(%{body: pairs}) do
     kvs =
       Enum.map(pairs, fn %{kind: :pair, args: %{label: key, value: value}} ->
-        quote location: :keep do
+        fn _better_params ->
           FarmbotCeleryScript.SysCalls.set_user_env(
-            unquote(key),
-            unquote(value)
+            (key),
+            (value)
           )
         end
       end)
 
-    quote location: :keep do
-      (unquote_splicing(kvs))
-    end
+    fn _better_params -> kvs end
   end
 
   def update_farmware(%{args: %{package: package}}) do
-    quote location: :keep do
-      package = unquote(Compiler.compile_ast(package))
+    fn _better_params ->
+      package = (Compiler.ast2elixir(package))
       FarmbotCeleryScript.SysCalls.log("Updating Farmware: #{package}", true)
       FarmbotCeleryScript.SysCalls.update_farmware(package)
     end

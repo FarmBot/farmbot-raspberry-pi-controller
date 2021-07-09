@@ -12,7 +12,7 @@ defmodule FarmbotCeleryScript.Compiler.If do
             rhs: rhs
           }
         }) do
-    rhs = Compiler.compile_ast(rhs)
+    rhs = Compiler.ast2elixir(rhs)
 
     # Turns the left hand side arg into
     # a number. x, y, z, and pin{number} are special that need to be
@@ -22,35 +22,31 @@ defmodule FarmbotCeleryScript.Compiler.If do
     lhs =
       case lhs_ast do
         "x" ->
-          quote [location: :keep],
-            do: FarmbotCeleryScript.SysCalls.get_cached_x()
-
+          fn _better_params ->
+            FarmbotCeleryScript.SysCalls.get_cached_x()
+          end
         "y" ->
-          quote [location: :keep],
-            do: FarmbotCeleryScript.SysCalls.get_cached_y()
-
+          fn _better_params ->
+            FarmbotCeleryScript.SysCalls.get_cached_y()
+          end
         "z" ->
-          quote [location: :keep],
-            do: FarmbotCeleryScript.SysCalls.get_cached_z()
-
+          fn _better_params ->
+            FarmbotCeleryScript.SysCalls.get_cached_z()
+          end
         "pin" <> pin ->
-          quote [location: :keep],
-            do:
+          fn _better_params ->
               FarmbotCeleryScript.SysCalls.read_cached_pin(
-                unquote(String.to_integer(pin))
+                (String.to_integer(pin))
               )
-
+          end
         # Named pin has two intents here
         # in this case we want to read the named pin.
         %AST{kind: :named_pin} = ast ->
-          quote [location: :keep],
-            do:
-              FarmbotCeleryScript.SysCalls.read_cached_pin(
-                unquote(Compiler.compile_ast(ast))
-              )
-
+          fn _better_params ->
+              FarmbotCeleryScript.SysCalls.read_cached_pin(Compiler.ast2elixir(ast))
+          end
         %AST{} = ast ->
-          Compiler.compile_ast(ast)
+          Compiler.ast2elixir(ast)
       end
 
     # Turn the `op` arg into Elixir code
@@ -63,39 +59,35 @@ defmodule FarmbotCeleryScript.Compiler.If do
           # get_current_y() == 10
           # get_current_z() == 200
           # read_pin(22, nil) == 5
-          # The ast will look like: {:==, [], lhs, Compiler.compile_ast(rhs)}
-          quote location: :keep do
-            unquote(lhs) == unquote(rhs)
+          # The ast will look like: {:==, [], lhs, Compiler.ast2elixir(rhs)}
+          fn _better_params ->
+            (lhs) == (rhs)
           end
 
         "not" ->
-          # ast will look like: {:!=, [], [lhs, Compiler.compile_ast(rhs)]}
-          quote location: :keep do
-            unquote(lhs) != unquote(rhs)
+          # ast will look like: {:!=, [], [lhs, Compiler.ast2elixir(rhs)]}
+          fn _better_params ->
+            (lhs) != (rhs)
           end
 
         "is_undefined" ->
           # ast will look like: {:is_nil, [], [lhs]}
-          quote location: :keep do
-            is_nil(unquote(lhs))
+          fn _better_params ->
+            is_nil(lhs)
           end
 
         "<" ->
-          # ast will look like: {:<, [], [lhs, Compiler.compile_ast(rhs)]}
-          quote location: :keep do
-            unquote(lhs) < unquote(rhs)
+          # ast will look like: {:<, [], [lhs, Compiler.ast2elixir(rhs)]}
+          fn _better_params ->
+            (lhs) < (rhs)
           end
 
         ">" ->
-          # ast will look like: {:>, [], [lhs, Compiler.compile_ast(rhs)]}
-          quote location: :keep do
-            unquote(lhs) > unquote(rhs)
-          end
+          # ast will look like: {:>, [], [lhs, Compiler.ast2elixir(rhs)]}
+          fn _better_params -> lhs > rhs end
 
         _ ->
-          quote location: :keep do
-            unquote(lhs)
-          end
+          fn _better_params -> lhs end
       end
 
     truthy_suffix =
@@ -117,33 +109,33 @@ defmodule FarmbotCeleryScript.Compiler.If do
     # else
     #    nothing()
     # end
-    quote location: :keep do
-      prefix_string = FarmbotCeleryScript.SysCalls.format_lhs(unquote(lhs_ast))
+    fn _better_params ->
+      prefix_string = FarmbotCeleryScript.SysCalls.format_lhs(lhs_ast)
       # examples:
       # "current x position is 100"
       # "pin 13 > 1"
       # "peripheral 10 is unknon"
       result_str =
-        case unquote(op) do
-          "is" -> "#{prefix_string} is #{unquote(rhs)}"
-          "not" -> "#{prefix_string} is not #{unquote(rhs)}"
+        case (op) do
+          "is" -> "#{prefix_string} is #{(rhs)}"
+          "not" -> "#{prefix_string} is not #{(rhs)}"
           "is_undefined" -> "#{prefix_string} is unknown"
-          "<" -> "#{prefix_string} is less than #{unquote(rhs)}"
-          ">" -> "#{prefix_string} is greater than #{unquote(rhs)}"
+          "<" -> "#{prefix_string} is less than #{(rhs)}"
+          ">" -> "#{prefix_string} is greater than #{(rhs)}"
         end
 
-      if unquote(if_eval) do
+      if (if_eval) do
         FarmbotCeleryScript.SysCalls.log(
-          "Evaluated IF statement: #{result_str}; #{unquote(truthy_suffix)}"
+          "Evaluated IF statement: #{result_str}; #{(truthy_suffix)}"
         )
 
-        unquote(FarmbotCeleryScript.Compiler.Utils.compile_block(then_ast))
+        (FarmbotCeleryScript.Compiler.Utils.compile_block(then_ast))
       else
         FarmbotCeleryScript.SysCalls.log(
-          "Evaluated IF statement: #{result_str}; #{unquote(falsey_suffix)}"
+          "Evaluated IF statement: #{result_str}; #{(falsey_suffix)}"
         )
 
-        unquote(FarmbotCeleryScript.Compiler.Utils.compile_block(else_ast))
+        (FarmbotCeleryScript.Compiler.Utils.compile_block(else_ast))
       end
     end
   end

@@ -77,7 +77,7 @@ defmodule FarmbotCeleryScript.Scheduler do
   def schedule(scheduler_pid \\ __MODULE__, celery_script, at, data)
 
   def schedule(sch, %AST{} = ast, %DateTime{} = at, %{} = data) do
-    schedule(sch, Compiler.compile(ast), at, data)
+    schedule(sch, Compiler.ast2elixir(ast), at, data)
   end
 
   def schedule(sch, compiled, at, %{} = data) when is_list(compiled) do
